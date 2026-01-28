@@ -90,7 +90,8 @@ app.post('/api/timeline', async (req, res) => {
     ...req.body, 
     status: 'upcoming',
     actual_start: null,
-    actual_end: null
+    actual_end: null,
+    remarks: ''
   };
   timeline.push(newItem);
   await saveData();
@@ -130,7 +131,8 @@ io.on('connection', (socket) => {
       if (item.id === id) {
         if (item.status !== 'live') {
           changed = true;
-          return { ...item, status: 'live', actual_start: now };
+          // Reset end time if restarting
+          return { ...item, status: 'live', actual_start: now, actual_end: null };
         }
       } 
       // If another item is live, mark it completed
@@ -166,6 +168,15 @@ io.on('connection', (socket) => {
          io.emit('timeline:data', timeline);
      }
   });
+
+  socket.on('admin:update_remark', async ({ id, remark }) => {
+      const index = timeline.findIndex(t => t.id === id);
+      if (index !== -1) {
+          timeline[index].remarks = remark;
+          await saveData();
+          io.emit('timeline:data', timeline);
+      }
+  });
   
   socket.on('admin:reset_item', async (id) => {
       const index = timeline.findIndex(t => t.id === id);
@@ -173,6 +184,7 @@ io.on('connection', (socket) => {
           timeline[index].status = 'upcoming';
           timeline[index].actual_start = null;
           timeline[index].actual_end = null;
+          timeline[index].remarks = ''; 
           await saveData();
           io.emit('timeline:data', timeline);
       }
